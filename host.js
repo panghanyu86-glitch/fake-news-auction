@@ -9,4 +9,10 @@ if(s.phase==='reveal'){$('reveal').className=`reveal ${q.truth}`;$('truth').text
 function showFinal(s){$('qnum').textContent='Finished';$('headline').textContent='The auction is over!';$('source').textContent='Popular ≠ Reliable';$('teaser').textContent='Clicks, shares and attention can amplify misleading information.';$('timer').innerHTML='✓<small>complete</small>';$('progressBar').style.width='100%';$('reveal').classList.add('hidden');$('finalPanel').classList.remove('hidden');const top=(s.leaderboard||[]).slice(0,3);const medals=['🥇','🥈','🥉'];$('podium').innerHTML=top.map((p,i)=>`<div class="podium-card place-${i+1}"><div class="medal">${medals[i]}</div><div class="place-label">${i===0?'1st Place':i===1?'2nd Place':'3rd Place'}</div><div class="podium-name">${p.name}</div><div class="podium-score">${p.score} pts</div></div>`).join('');$('mostEngaging').innerHTML=s.mostEngaging?`🔥 <b>Most engaging post:</b> ${QUESTIONS[s.mostEngaging.questionIndex].headline}<br>${s.mostEngaging.engagement} engagement points`:''}
 $('startBtn').onclick=async()=>{try{await api('POST',{action:'start'});await tick()}catch(e){alert('Cannot start: '+e.message)}};
 $('resetBtn').onclick=async()=>{if(confirm('Reset the whole lobby and clear all player submissions?')){try{await api('POST',{action:'reset'});await tick()}catch(e){alert('Cannot reset: '+e.message)}}};
-async function tick(){try{render(await api())}catch(e){$('hostStatus').textContent='Reconnect…'}}setInterval(tick,500);tick();
+async function tick(){try{render(await api())}catch(e){$('hostStatus').textContent='Reconnect…'}}let tickTimer=null;
+async function scheduleTick(){
+  clearTimeout(tickTimer);
+  await tick();
+  tickTimer=setTimeout(scheduleTick,700);
+}
+scheduleTick();
