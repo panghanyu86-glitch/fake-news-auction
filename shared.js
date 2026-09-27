@@ -58,7 +58,7 @@ export const QUESTIONS = [
 ];
 
 export const QUESTION_SECONDS = 30;
-export const BET_SECONDS = 20;
-export const LOCK_SECONDS = 2;
+export const BET_SECONDS = 30;
+export const LOCK_SECONDS = 0;
 export const REVEAL_SECONDS = 8;
 export const TOTAL_COINS = 12;
