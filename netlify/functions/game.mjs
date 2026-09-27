@@ -90,6 +90,10 @@ async function getSubmission(store, gameId, playerId, q) {
   return store.get(`sub/${gameId}/${playerId}/${q}`, { type: "json" });
 }
 
+async function getPlayer(store, gameId, playerId) {
+  return store.get(`player/${gameId}/${playerId}`, { type: "json" });
+}
+
 async function playerCount(store, gameId) {
   return (await listKeys(store, `player/${gameId}/`)).length;
 }
@@ -144,16 +148,74 @@ export default async (req, context) => {
       if (body.action === "reset") {
         game = { status: "waiting", gameId: crypto.randomUUID(), createdAt: now };
         await store.setJSON("game", game);
-      } else if (body.action === "start") {
+        return response({ ok: true, gameId: game.gameId });
+      }
+
+      if (body.action === "start") {
         game = { ...game, status: "running", startAt: now + 1500 };
         await store.setJSON("game", game);
-      } else if (body.action === "join") {
+        return response({ ok: true, gameId: game.gameId });
+      }
+
+      if (body.action === "join") {
         const name = String(body.name || "").trim().slice(0, 24);
         if (!name) return response({ error: "Name required" }, 400);
         if (!body.playerId) return response({ error: "Player ID required" }, 400);
-        await store.setJSON(`player/${game.gameId}/${body.playerId}`, { playerId: body.playerId, name, joinedAt: now });
-      } else if (body.action === "submit") {
+
+        await store.setJSON(
+          `player/${game.gameId}/${body.playerId}`,
+          { playerId: body.playerId, name, joinedAt: now, lastSeenAt: now }
+        );
+
+        return response({ ok: true, gameId: game.gameId, name });
+      }
+
+      if (body.action === "submit") {
         const phase = phaseOf(game, now);
+        if (phase.phase !== "bet" || phase.questionIndex !== body.questionIndex) {
+          return response({ error: "Betting is closed" }, 409);
+        }
+
+        const player = await getPlayer(store, game.gameId, body.playerId);
+        if (!player) {
+          return response({ error: "You are not joined to this game. Please rejoin." }, 409);
+        }
+
+        const existing = await getSubmission(store, game.gameId, body.playerId, body.questionIndex);
+        if (existing) return response({ error: "Already submitted" }, 409);
+
+        const wallet = await getWallet(store, game.gameId, body.playerId);
+        const coins = Number(body.coins);
+
+        if (!Number.isInteger(coins) || coins < 0 || coins > 3 || coins > wallet.coinsLeft) {
+          return response({ error: "Invalid coin amount" }, 400);
+        }
+        if (!["Accurate", "Misleading", "False"].includes(body.guess)) {
+          return response({ error: "Choose Accurate, Misleading or False" }, 400);
+        }
+        if (body.share && wallet.shareLeft < 1) {
+          return response({ error: "Share already used" }, 400);
+        }
+
+        await store.setJSON(
+          `sub/${game.gameId}/${body.playerId}/${body.questionIndex}`,
+          {
+            playerId: body.playerId,
+            questionIndex: body.questionIndex,
+            coins,
+            guess: body.guess,
+            share: !!body.share,
+            submittedAt: now,
+          }
+        );
+
+        return response({ ok: true, gameId: game.gameId, questionIndex: body.questionIndex });
+      }
+
+      return response({ error: "Unknown action" }, 400);
+    }
+
+    const phase = phaseOf(game, now);
         if (phase.phase !== "bet" || phase.questionIndex !== body.questionIndex) return response({ error: "Betting is closed" }, 409);
 
         const existing = await getSubmission(store, game.gameId, body.playerId, body.questionIndex);
@@ -192,6 +254,9 @@ export default async (req, context) => {
     };
 
     if (playerIdFromQuery) {
+      const currentPlayer = await getPlayer(store, game.gameId, playerIdFromQuery);
+      base.registered = !!currentPlayer;
+
       const scoredThrough = phase.status === "finished"
         ? Infinity
         : phase.status === "running" && phase.phase === "reveal"
