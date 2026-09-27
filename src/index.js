@@ -101,27 +101,29 @@ function submissionKey(playerId, questionIndex) {
   return playerId + ":" + questionIndex;
 }
 
-function walletFor(game, playerId, scoredThrough = Infinity) {
-  let spent = 0;
+function walletFor(game, playerId, rewardedThrough = Infinity) {
+  let balance = TOTAL;
   let shared = 0;
-  let score = 0;
 
   for (const sub of Object.values(game.submissions || {})) {
     if (sub.playerId !== playerId) continue;
 
-    spent += sub.coins || 0;
+    // The stake is paid immediately when the player submits.
+    balance -= sub.coins || 0;
     shared += sub.share ? 1 : 0;
 
-    if (sub.questionIndex <= scoredThrough) {
+    // Winnings are only added once the answer has been revealed.
+    if (sub.questionIndex <= rewardedThrough) {
       const truth = QUESTIONS[sub.questionIndex]?.truth;
-      score += sub.guess === truth ? (sub.coins || 0) * 2 : -(sub.coins || 0);
+      if (sub.guess === truth) {
+        balance += (sub.coins || 0) * 2;
+      }
     }
   }
 
   return {
-    coinsLeft: Math.max(0, TOTAL - spent),
+    coinsLeft: Math.max(0, balance),
     shareLeft: Math.max(0, 1 - shared),
-    score,
   };
 }
 
@@ -137,9 +139,9 @@ function finalStats(game) {
   const leaderboard = Object.values(game.players || {})
     .map((p) => ({
       name: p.name,
-      score: walletFor(game, p.playerId).score,
+      coins: walletFor(game, p.playerId).coinsLeft,
     }))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.coins - a.coins);
 
   return {
     mostEngaging: engagement[0] || null,
@@ -289,7 +291,7 @@ export class GameRoom extends DurableObject {
             guess: sub.guess,
             share: sub.share,
             correct,
-            scoreDelta: correct ? sub.coins * 2 : -sub.coins,
+            rewardCoins: correct ? sub.coins * 2 : 0,
           };
         } else {
           base.playerSubmission = { submitted: false };
