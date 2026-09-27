@@ -173,13 +173,12 @@ function renderRoundResult(s) {
     return;
   }
 
-  const sign = sub.scoreDelta > 0 ? '+' : '';
   $('roundResult').innerHTML =
     '<div class="round-big">' + (sub.correct ? 'Correct! 🎉' : 'Not quite this time.') + '</div>' +
     '<div>You bet <b>' + sub.coins + ' 🪙</b> and chose <b>' + sub.guess + '</b>.</div>' +
-    '<div class="round-score">' + sign + sub.scoreDelta + ' pts this round</div>' +
-    '<div class="round-formula">' + (sub.correct ? (sub.coins + ' coins × 2') : ('−' + sub.coins + ' coins')) + '</div>' +
-    '<div class="round-total">Total score: <b>' + (s.wallet?.score ?? 0) + '</b> • Coins left: <b>' + (s.wallet?.coinsLeft ?? 0) + '</b></div>';
+    '<div class="round-score">' + (sub.correct ? ('You won ' + sub.rewardCoins + ' 🪙') : ('You lost ' + sub.coins + ' 🪙')) + '</div>' +
+    '<div class="round-formula">' + (sub.correct ? (sub.coins + ' coins × 2 = ' + sub.rewardCoins + ' coins') : ('Lost stake: ' + sub.coins + ' coins')) + '</div>' +
+    '<div class="round-total">Current balance: <b>' + (s.wallet?.coinsLeft ?? 0) + ' 🪙</b></div>';
 }
 
 async function ensureRegistered(s) {
@@ -201,7 +200,6 @@ function render(s) {
   $('phasePill').textContent = s.phaseLabel || 'Waiting';
   $('coinsLeft').textContent = s.wallet?.coinsLeft ?? TOTAL_COINS;
   $('shareLeft').textContent = s.wallet?.shareLeft ?? 1;
-  $('score').textContent = s.wallet?.score ?? 0;
 
   if (s.status === 'waiting') {
     $('pqnum').textContent = 'Lobby';
@@ -220,7 +218,7 @@ function render(s) {
     $('gamePanel').classList.add('hidden');
     $('playerFinal').classList.remove('hidden');
     $('personalResult').innerHTML =
-      'Your final score: <b>' + (s.wallet?.score ?? 0) + ' points</b><br>Coins left: ' + (s.wallet?.coinsLeft ?? 0);
+      'Your final balance: <b>' + (s.wallet?.coinsLeft ?? 0) + ' 🪙</b>';
     return;
   }
 
