@@ -11,8 +11,8 @@ const QUESTIONS = [
   { truth: "False" },
 ];
 
-const BET = 20_000;
-const LOCK = 2_000;
+const BET = 30_000;
+const LOCK = 0;
 const REVEAL = 8_000;
 const STEP = BET + LOCK + REVEAL;
 const TOTAL = 12;
@@ -46,10 +46,7 @@ function phaseOf(game, now) {
   if (within < BET) {
     return { status: "running", phase: "bet", phaseLabel: "Betting", questionIndex: qi, phaseEndsAt: now + (BET - within), phaseProgress: within / BET };
   }
-  if (within < BET + LOCK) {
-    return { status: "running", phase: "lock", phaseLabel: "Locked", questionIndex: qi, phaseEndsAt: now + (BET + LOCK - within), phaseProgress: (within - BET) / LOCK };
-  }
-  return { status: "running", phase: "reveal", phaseLabel: "Reveal", questionIndex: qi, phaseEndsAt: now + (STEP - within), phaseProgress: (within - BET - LOCK) / REVEAL };
+  return { status: "running", phase: "reveal", phaseLabel: "Result", questionIndex: qi, phaseEndsAt: now + (STEP - within), phaseProgress: (within - BET) / REVEAL };
 }
 
 async function getGame(store) {
