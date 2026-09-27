@@ -11,9 +11,9 @@ const QUESTIONS = [
   { truth: "False" },
 ];
 
-const BET = 25_000;
-const LOCK = 3_000;
-const REVEAL = 10_000;
+const BET = 20_000;
+const LOCK = 2_000;
+const REVEAL = 8_000;
 const STEP = BET + LOCK + REVEAL;
 const TOTAL = 12;
 
@@ -72,7 +72,7 @@ async function listKeys(store, prefix) {
   return out;
 }
 
-async function getWallet(store, gameId, playerId) {
+async function getWallet(store, gameId, playerId, scoredThrough = Infinity) {
   const keys = await listKeys(store, `sub/${gameId}/${playerId}/`);
   let spent = 0, shared = 0, score = 0;
   for (const k of keys) {
@@ -81,8 +81,10 @@ async function getWallet(store, gameId, playerId) {
     spent += s.coins || 0;
     shared += s.share ? 1 : 0;
     const truth = QUESTIONS[s.questionIndex]?.truth;
-    if (s.guess === truth) score += (s.coins || 0) * 2;
-    else score -= s.coins || 0;
+    if (s.questionIndex <= scoredThrough) {
+      if (s.guess === truth) score += (s.coins || 0) * 2;
+      else score -= s.coins || 0;
+    }
   }
   return { coinsLeft: Math.max(0, TOTAL - spent), shareLeft: Math.max(0, 1 - shared), score };
 }
@@ -178,8 +180,14 @@ export default async (req, context) => {
     }
 
     const phase = phaseOf(game, now);
+    const elapsedInItem = game.status === "running" ? Math.max(0, (now - game.startAt) % STEP) : 0;
+    const itemEndsAt = phase.status === "running" ? now + (STEP - elapsedInItem) : null;
+    const itemProgress = phase.status === "running" ? Math.min(1, elapsedInItem / STEP) : (phase.status === "finished" ? 1 : 0);
+
     const base = {
       ...phase,
+      itemEndsAt,
+      itemProgress,
       serverNow: now,
       gameId: game.gameId,
       playerCount: await playerCount(store, game.gameId),
@@ -187,9 +195,32 @@ export default async (req, context) => {
     };
 
     if (playerIdFromQuery) {
-      base.wallet = await getWallet(store, game.gameId, playerIdFromQuery);
+      const scoredThrough = phase.status === "finished"
+        ? Infinity
+        : phase.status === "running" && phase.phase === "reveal"
+          ? phase.questionIndex
+          : phase.status === "running"
+            ? phase.questionIndex - 1
+            : -1;
+
+      base.wallet = await getWallet(store, game.gameId, playerIdFromQuery, scoredThrough);
+
       if (phase.status === "running") {
-        base.playerSubmission = { submitted: !!(await getSubmission(store, game.gameId, playerIdFromQuery, phase.questionIndex)) };
+        const submission = await getSubmission(store, game.gameId, playerIdFromQuery, phase.questionIndex);
+
+        if (submission) {
+          const correct = submission.guess === QUESTIONS[phase.questionIndex]?.truth;
+          base.playerSubmission = {
+            submitted: true,
+            coins: submission.coins,
+            guess: submission.guess,
+            share: submission.share,
+            correct,
+            scoreDelta: correct ? submission.coins * 2 : -submission.coins,
+          };
+        } else {
+          base.playerSubmission = { submitted: false };
+        }
       }
     }
 
