@@ -103,15 +103,12 @@ function submissionKey(playerId, questionIndex) {
 
 function walletFor(game, playerId, rewardedThrough = Infinity) {
   let balance = TOTAL;
-  let shared = 0;
 
   for (const sub of Object.values(game.submissions || {})) {
     if (sub.playerId !== playerId) continue;
 
     // The stake is paid immediately when the player submits.
     balance -= sub.coins || 0;
-    shared += sub.share ? 1 : 0;
-
     // Winnings are only added once the answer has been revealed.
     if (sub.questionIndex <= rewardedThrough) {
       const truth = QUESTIONS[sub.questionIndex]?.truth;
@@ -123,7 +120,6 @@ function walletFor(game, playerId, rewardedThrough = Infinity) {
 
   return {
     coinsLeft: Math.max(0, balance),
-    shareLeft: Math.max(0, 1 - shared),
   };
 }
 
@@ -133,7 +129,7 @@ function finalStats(game) {
     questionIndex: i,
     engagement: submissions
       .filter((s) => s.questionIndex === i)
-      .reduce((sum, s) => sum + (s.coins || 0) + (s.share ? 2 : 0), 0),
+      .reduce((sum, s) => sum + (s.coins || 0), 0),
   })).sort((a, b) => b.engagement - a.engagement);
 
   const leaderboard = Object.values(game.players || {})
@@ -230,16 +226,11 @@ export class GameRoom extends DurableObject {
           return json({ error: "Choose Accurate, Misleading or False" }, 400);
         }
 
-        if (body.share && wallet.shareLeft < 1) {
-          return json({ error: "Share already used" }, 400);
-        }
-
         game.submissions[key] = {
           playerId,
           questionIndex: body.questionIndex,
           coins,
           guess: body.guess,
-          share: !!body.share,
           submittedAt: now,
         };
 
@@ -289,7 +280,6 @@ export class GameRoom extends DurableObject {
             submitted: true,
             coins: sub.coins,
             guess: sub.guess,
-            share: sub.share,
             correct,
             rewardCoins: correct ? sub.coins * 2 : 0,
           };
