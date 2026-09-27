@@ -10,7 +10,6 @@ let savedName = localStorage.getItem('fna_name') || '';
 let currentGameId = localStorage.getItem('fna_game_id') || '';
 let selectedCoins = null;
 let selectedTruth = null;
-let useShare = false;
 let lastQ = -1;
 let joining = false;
 let submitting = false;
@@ -100,12 +99,6 @@ if (joined) {
   $('gamePanel').classList.remove('hidden');
 }
 
-$('shareBtn').onclick = () => {
-  useShare = !useShare;
-  $('shareBtn').classList.toggle('active', useShare);
-  $('shareBtn').textContent = useShare ? '🔁 Share selected' : '🔁 Use Share (+2 engagement)';
-};
-
 $('submitBtn').onclick = async () => {
   if (submitting) return;
   if (selectedCoins === null || !selectedTruth) {
@@ -129,8 +122,7 @@ $('submitBtn').onclick = async () => {
       playerId,
       questionIndex:lastQ,
       coins:selectedCoins,
-      guess:selectedTruth,
-      share:useShare
+      guess:selectedTruth
     });
     await tick();
   } catch (e) {
@@ -158,10 +150,7 @@ $('submitBtn').onclick = async () => {
 function resetSelection() {
   selectedCoins = null;
   selectedTruth = null;
-  useShare = false;
   [...document.querySelectorAll('.coin,.truth-btn')].forEach(x => x.classList.remove('active'));
-  $('shareBtn').classList.remove('active');
-  $('shareBtn').textContent = '🔁 Use Share (+2 engagement)';
   $('submitBtn').disabled = false;
   $('submitBtn').textContent = 'Submit';
 }
@@ -199,7 +188,6 @@ function render(s) {
 
   $('phasePill').textContent = s.phaseLabel || 'Waiting';
   $('coinsLeft').textContent = s.wallet?.coinsLeft ?? TOTAL_COINS;
-  $('shareLeft').textContent = s.wallet?.shareLeft ?? 1;
 
   if (s.status === 'waiting') {
     $('pqnum').textContent = 'Lobby';
@@ -252,7 +240,6 @@ function render(s) {
     [...$('coinOptions').children].forEach((b,i) => {
       b.disabled = i > (s.wallet?.coinsLeft ?? 0);
     });
-    $('shareBtn').disabled = (s.wallet?.shareLeft ?? 1) < 1;
   } else {
     $('betArea').classList.add('hidden');
     $('submittedBox').classList.toggle('hidden', !(submitted && s.phase !== 'reveal'));
